@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Google Photos Uploader</title>
+
+    <!-- PWA / Web App -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="Google Photos Uploader Web App">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Photos Uploader">
+
+    <!-- iOS fallback -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Photos Uploader">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { background-color: #0f172a; }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .app-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px auto;
+            box-shadow: 0 20px 40px rgba(37, 99, 235, 0.35);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-slate-200">
+
+    <div id="setup-screen" class="glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl">
+
+        <!-- Web Logo -->
+        <div class="app-logo">
+            <i data-lucide="image-up" class="w-9 h-9 text-white"></i>
+        </div>
+
+        <h2 class="text-xl font-bold text-white mb-2 text-center">Google Photos Uploader</h2>
+        <p class="text-sm text-slate-400 mb-6 text-center">อัปโหลดรูปภาพและวิดีโอไปยัง Google Photos</p>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Client ID</label>
+                <input type="text" id="cfg-id" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm" placeholder="ใส่ Client ID">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Client Secret</label>
+                <input type="password" id="cfg-secret" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm" placeholder="ใส่ Client Secret">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Access Token</label>
+                <textarea id="cfg-token" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm h-24" placeholder="ใส่ JSON Access Token"></textarea>
+            </div>
+
+            <button id="save-btn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-4">
+                บันทึกและเริ่มต้น
+            </button>
+        </div>
+    </div>
+
+    <div id="upload-screen" class="hidden glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl">
+
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center">
+                <i data-lucide="image-up" class="w-6 h-6 text-white"></i>
+            </div>
+
+            <div class="flex-1">
+                <h1 class="font-bold text-white">พร้อมอัปโหลด</h1>
+                <p class="text-xs text-slate-400">เลือกไฟล์เพื่ออัปโหลดไปยัง Google Photos</p>
+            </div>
+
+            <button onclick="location.reload()" class="text-xs text-slate-500 hover:text-white">
+                ตั้งค่าใหม่
+            </button>
+        </div>
+
+        <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center hover:border-blue-500 transition-all cursor-pointer">
+            <input type="file" id="media-input" accept=".mp4,.mov,.jpeg,.jpg,.png,.gif" class="hidden">
+
+            <i data-lucide="upload-cloud" class="w-10 h-10 text-blue-400 mx-auto mb-2"></i>
+
+            <p class="text-sm">คลิกเพื่อเลือกไฟล์</p>
+            <p class="text-xs text-slate-500 mt-1">MP4, MOV, JPG, PNG, GIF</p>
+        </div>
+
+        <div id="preview-container" class="hidden mt-4 space-y-4">
+            <div id="media-preview" class="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-700"></div>
+
+            <button id="upload-btn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl">
+                เริ่มอัปโหลด
+            </button>
+        </div>
+
+        <div id="status-message" class="mt-4 hidden p-3 rounded-lg text-sm text-center"></div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let config = {};
+
+        // Register Service Worker for PWA installability
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    await navigator.serviceWorker.register('/service-worker.js');
+                    console.log('Service Worker registered');
+                } catch (error) {
+                    console.error('Service Worker registration failed:', error);
+                }
+            });
+        }
+
+        document.getElementById('save-btn').onclick = () => {
+            try {
+                config = {
+                    id: document.getElementById('cfg-id').value,
+                    secret: document.getElementById('cfg-secret').value,
+                    token: JSON.parse(document.getElementById('cfg-token').value || '{}')
+                };
+
+                if (!config.token.access_token) {
+                    return alert('กรุณาระบุ Token ในรูปแบบ JSON');
+                }
+
+                document.getElementById('setup-screen').classList.add('hidden');
+                document.getElementById('upload-screen').classList.remove('hidden');
+
+                lucide.createIcons();
+            } catch (error) {
+                alert('รูปแบบ JSON ของ Access Token ไม่ถูกต้อง');
+            }
+        };
+
+        const mediaInput = document.getElementById('media-input');
+        const dropZone = document.getElementById('drop-zone');
+
+        dropZone.onclick = () => mediaInput.click();
+
+        mediaInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('preview-container').classList.remove('hidden');
+
+            if (file.type.startsWith('image/')) {
+                document.getElementById('media-preview').innerHTML = `
+                    <img src="${URL.createObjectURL(file)}" class="max-h-full object-contain">
+                `;
+            } else {
+                document.getElementById('media-preview').innerHTML = `
+                    <video src="${URL.createObjectURL(file)}" controls class="w-full h-full object-contain"></video>
+                `;
+            }
+
+            dropZone.classList.add('hidden');
+        };
+
+        document.getElementById('upload-btn').onclick = async () => {
+            const file = mediaInput.files[0];
+            if (!file) return;
+
+            const status = document.getElementById('status-message');
+
+            status.classList.remove('hidden');
+            status.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-blue-900/30 text-blue-300';
+            status.textContent = 'กำลังอัปโหลด...';
+
+            try {
+                const tokenRes = await fetch('https://photoslibrary.googleapis.com/v1/uploads', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.token.access_token}`,
+                        'X-Goog-Upload-Protocol': 'raw',
+                        'Content-Type': file.type
+                    },
+                    body: file
+                });
+
+                if (!tokenRes.ok) {
+                    throw new Error('การอัปโหลดล้มเหลว');
+                }
+
+                const uploadToken = await tokenRes.text();
+
+                const createRes = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.token.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        newMediaItems: [
+                            {
+                                simpleMediaItem: {
+                                    uploadToken: uploadToken
+                                }
+                            }
+                        ]
+                    })
+                });
+
+                if (!createRes.ok) {
+                    throw new Error('สร้าง Media Item ไม่สำเร็จ');
+                }
+
+                status.textContent = 'อัปโหลดสำเร็จ!';
+                status.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-green-900/30 text-green-300';
+
+            } catch (e) {
+                status.textContent = 'Error: ' + e.message;
+                status.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-red-900/30 text-red-300';
+            }
+        };
+    </script>
+
+</body>
+</html>
